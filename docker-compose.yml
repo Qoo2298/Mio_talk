@@ -8,9 +8,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./.env:/app/.env
-      - ./memory:/app/memory
-      - ./mio_memory.db:/app/mio_memory.db
+      - .:/app
     dns:
       - 8.8.8.8
     environment:
