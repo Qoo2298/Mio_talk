@@ -91,7 +91,7 @@ async def on_message(message: discord.Message):
                         input_tokens = int(token_usage * 0.7)
                         output_tokens = int(token_usage * 0.3)
                     
-                    # コスト計算
+                    # コスト計算 (Input $0.50/1M, Output $3.00/1M - ユーザー指定)
                     input_cost = (input_tokens / 1_000_000) * 0.50 * 155
                     output_cost = (output_tokens / 1_000_000) * 3.00 * 155
                     total_cost = input_cost + output_cost
@@ -153,29 +153,35 @@ async def call_mio_streaming_generator(text: str):
                     
                     # print(f"DEBUG Line: {line[:50]}...") # デバッグ用
 
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        try:
-                            data = json.loads(data_str)
+                if line.startswith("data: "):
+                    data_str = line[6:]
+                    try:
+                        data = json.loads(data_str)
+                        
+                        if data.get("type") == "chunk":
+                            content = data.get("content", "")
+                            if content:
+                                yield {"type": "content", "data": content}
+                        
+                        # 新しい形式 {'type': 'usage', 'data': {...}} に対応
+                        elif data.get("type") == "usage":
+                            token_usage = data.get("data")
+                            yield {"type": "usage", "data": token_usage}
+                        
+                        # 古い形式互換（念のため）
+                        elif data.get("usage"):
+                            yield {"type": "usage", "data": data.get("usage")}
                             
-                            if data.get("type") == "chunk":
-                                content = data.get("content", "")
-                                if content:
-                                    yield {"type": "content", "data": content}
+                        elif data.get("type") == "end":
+                            return
+                        
+                        elif data.get("error"):
+                            print(f"API Error: {data.get('error')}")
+                            yield {"type": "content", "data": f"\n[Error: {data.get('error')}]"}
                             
-                            elif data.get("usage"): # トークン情報
-                                yield {"type": "usage", "data": data.get("usage")}
-                                
-                            elif data.get("type") == "end":
-                                return
-                            
-                            elif data.get("error"):
-                                print(f"API Error: {data.get('error')}")
-                                yield {"type": "content", "data": f"\n[Error: {data.get('error')}]"}
-                                
-                        except json.JSONDecodeError as e:
-                            print(f"JSON Error: {e} in {data_str}")
-                            continue
+                    except json.JSONDecodeError as e:
+                        print(f"JSON Error: {e} in {data_str}")
+                        continue
                             
             # ループ終了後
             print("Stream finished.")
@@ -206,7 +212,8 @@ async def handle_compaction(message: discord.Message):
                 input_tokens = int(token_usage * 0.7)
                 output_tokens = int(token_usage * 0.3)
             
-            cost = (input_tokens / 1000000) * 0.5 * 155 + (output_tokens / 1000000) * 3.0 * 155
+            # Cost Calculation (Input $0.50/1M, Output $3.00/1M - ユーザー指定)
+            cost = (input_tokens / 1_000_000) * 0.50 * 155 + (output_tokens / 1_000_000) * 3.00 * 155
             
             result_lines = [
                 f"**{timestamp}**",

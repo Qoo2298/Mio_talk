@@ -9,6 +9,10 @@ const state = {
     ttsMode: "LOCAL"
 };
 
+// --- SVG Icons ---
+const ICON_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>';
+const ICON_STOP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"></rect></svg>';
+
 // Elements Cache
 const elements = {
     mioMessage: document.getElementById('mio-message'),
@@ -193,7 +197,7 @@ function processMessage(text, imageId = null) {
         // UIリセット
         if (elements.talkBtn) {
             elements.talkBtn.classList.remove('loading');
-            elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>'; // マイクアイコンに戻す
+            elements.talkBtn.innerHTML = ICON_SEND;
         }
         if (elements.visualCore) elements.visualCore.classList.remove('thinking');
         updateStatus("Aborted");
@@ -210,7 +214,7 @@ function processMessage(text, imageId = null) {
     // ボタンを「× (停止)」に変更
     if (elements.talkBtn) {
         elements.talkBtn.classList.add('loading');
-        elements.talkBtn.innerHTML = '<i class="fas fa-times"></i>';
+        elements.talkBtn.innerHTML = ICON_STOP;
     }
     if (elements.visualCore) elements.visualCore.classList.add('thinking');
 
@@ -239,12 +243,17 @@ function processMessage(text, imageId = null) {
                 } else if (data.type === "audio") {
                     audioQueue.push(data.content);
                     playNextAudio();
-                } else if (data.type === "usage" && data.data) { // data.data形式に対応
+                } else if (data.type === "usage" && data.data) {
                     const usage = data.data;
                     const tokenEl = document.getElementById('token-usage');
                     if (tokenEl && usage) {
+                        // コスト計算 (Input $0.50/1M, Output $3.00/1M)
+                        const inputCost = (usage.prompt_token_count / 1000000) * 0.50;
+                        const outputCost = (usage.candidates_token_count / 1000000) * 3.00;
+                        const totalUSD = inputCost + outputCost;
+                        const totalJPY = totalUSD * 155; // 概算レート
                         tokenEl.style.display = 'block';
-                        tokenEl.textContent = `In ${usage.prompt_token_count} / Out ${usage.candidates_token_count}`;
+                        tokenEl.innerHTML = `📊 In:${usage.prompt_token_count} Out:${usage.candidates_token_count} | 💰 $${totalUSD.toFixed(5)} (¥${totalJPY.toFixed(3)})`;
                     }
                 } else if (data.type === "end") {
                     eventSource.close();
@@ -254,7 +263,7 @@ function processMessage(text, imageId = null) {
                     // UIリセット
                     if (elements.talkBtn) {
                         elements.talkBtn.classList.remove('loading');
-                        elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                        elements.talkBtn.innerHTML = ICON_SEND;
                     }
                     if (elements.visualCore) elements.visualCore.classList.remove('thinking');
                     updateStatus("Online");
@@ -277,7 +286,7 @@ function processMessage(text, imageId = null) {
             updateStatus("Error");
             if (elements.talkBtn) {
                 elements.talkBtn.classList.remove('loading');
-                elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                elements.talkBtn.innerHTML = ICON_SEND;
             }
             if (elements.visualCore) elements.visualCore.classList.remove('thinking');
         };
@@ -490,6 +499,11 @@ window.onload = () => {
 
     if (elements.talkBtn) {
         elements.talkBtn.onclick = () => {
+            // 処理中の場合は中断
+            if (state.isProcessing) {
+                processMessage(null);
+                return;
+            }
             const text = elements.userInput.value.trim();
             if (text || state.pendingImageId) {
                 elements.userInput.value = "";

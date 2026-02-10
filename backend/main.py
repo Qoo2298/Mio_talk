@@ -132,11 +132,14 @@ async def synthesize_audio_async(text, mode=None):
     if not text: return None
     
     current_mode = mode if mode else TTS_MODE
+    
+    if current_mode == "SILENT":
+        return None # 無言モード
+
     print(f"Synthesizing Async ({current_mode}): {text[:10]}...") # デバッグログ
 
     try:
         if current_mode == "API":
-             # Aivis Cloud API 実装
              # Aivis Cloud API 実装
              if not AIVIS_CLOUD_KEY:
                  print("Error: AIVIS_CLOUD_KEY is not set.")
@@ -252,15 +255,16 @@ async def get_embedding(text):
     if not text: return None
     try:
         if not GEMINI_API_KEY: return None
-        # embedding-001 モデルを使用 (シンプル呼び出し)
+        # gemini-embedding-001 モデルを使用
         result = await asyncio.to_thread(
             genai.embed_content,
-            model="models/embedding-001",
-            content=text
+            model="models/gemini-embedding-001",
+            content=text,
+            task_type="retrieval_document" # 検索・保存用として最適化
         )
         return result['embedding']
-    except Exception:
-        # print(f"Embedding Error: {e}") # Silent error
+    except Exception as e:
+        print(f"Embedding Error ({type(e).__name__}): {e}") # 詳細エラーログ
         return None
 
 # --- 履歴取得API ---
@@ -431,7 +435,7 @@ async def stream_chat_endpoint(text: str, mode: str = None, image_id: str = None
 
             if usage_info:
                 print(f"Token Usage: {usage_info}")
-                yield f"data: {json.dumps({'usage': usage_info})}\n\n"
+                yield f"data: {json.dumps({'type': 'usage', 'data': usage_info})}\n\n"
 
             # ★全ての処理が終わったら、MIOの返答を記憶（DB保存）
             if full_response_text:
