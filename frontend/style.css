@@ -935,3 +935,10 @@ footer {
 .compact-update strong {
     color: var(--text-primary);
 }
+
+/* ============ MOBILE ============ */
+@media (max-width: 768px) {
+    #volume-control-floating {
+        display: none !important;
+    }
+}

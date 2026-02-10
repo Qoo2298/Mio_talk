@@ -16,5 +16,20 @@ services:
       - GEMINI_API_KEY
       - AIVIS_CLOUD_KEY
       - TTS_MODE
+
+  mio-discord-bot:
+    build: .
+    container_name: mio-discord-bot
+    restart: always
+    depends_on:
+      - mio-backend
+    entrypoint: [ "python", "discord_bot.py" ]
+    volumes:
+      - .:/app
+    environment:
+      - TZ=Asia/Tokyo
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - MIO_CHANNEL_ID=${MIO_CHANNEL_ID}
+      - MIO_API_BASE=http://mio-backend:8000
     # ラズパイのカメラ（/dev/video0など）を使う場合は、ここにdevice設定を追加することになるかもしれません
     # 今回はTapo（IPカメラ）なので不要ですが、一応メモです。

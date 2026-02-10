@@ -82,6 +82,7 @@ function playNextAudio() {
 // --- TTS Logic ---
 async function speakText(text) {
     if (!text) return;
+    if (state.ttsMode === "SILENT") return; // 無言モード
     state.isSpeaking = true;
     if (elements.visualCore) elements.visualCore.classList.add('talking');
 
@@ -227,7 +228,7 @@ function processMessage(text, imageId = null) {
                     if (elements.visualCore) elements.visualCore.classList.remove('thinking');
                     updateStatus("Online");
 
-                    if (mode === "LOCAL" && fullResponse && audioQueue.length === 0) {
+                    if (mode !== "SILENT" && mode === "LOCAL" && fullResponse && audioQueue.length === 0) {
                         speakText(fullResponse);
                     }
                 }
@@ -379,6 +380,11 @@ window.onload = () => {
                 ttsBtn.textContent = "☁️";
                 ttsBtn.classList.remove('active');
                 ttsBtn.title = "音声: クラウド";
+            } else if (state.ttsMode === "API") {
+                state.ttsMode = "SILENT";
+                ttsBtn.textContent = "🔇";
+                ttsBtn.classList.remove('active');
+                ttsBtn.title = "音声: 無言";
             } else {
                 state.ttsMode = "LOCAL";
                 ttsBtn.textContent = "🏠";
