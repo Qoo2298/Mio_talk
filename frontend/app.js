@@ -177,17 +177,41 @@ if (clearImageBtn) {
 }
 
 // --- Main Chat Function ---
+// --- Main Chat Function ---
 function updateStatus(text) {
     if (elements.systemStatusText) elements.systemStatusText.textContent = text;
 }
 
 function processMessage(text, imageId = null) {
-    if (!text && !imageId) return;
-    if (state.isProcessing) return;
+    if (state.isProcessing && state.currentEventSource) {
+        // --- 中断処理 (Stop) ---
+        console.log("Aborting current request...");
+        state.currentEventSource.close();
+        state.currentEventSource = null;
+        state.isProcessing = false;
 
+        // UIリセット
+        if (elements.talkBtn) {
+            elements.talkBtn.classList.remove('loading');
+            elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>'; // マイクアイコンに戻す
+        }
+        if (elements.visualCore) elements.visualCore.classList.remove('thinking');
+        updateStatus("Aborted");
+        return;
+    }
+
+    if (!text && !imageId) return;
+    if (state.isProcessing) return; // 既に処理中（二重起動防止）
+
+    // --- 開始処理 (Start) ---
     state.isProcessing = true;
     updateStatus("考え中...");
-    if (elements.talkBtn) elements.talkBtn.classList.add('loading');
+
+    // ボタンを「× (停止)」に変更
+    if (elements.talkBtn) {
+        elements.talkBtn.classList.add('loading');
+        elements.talkBtn.innerHTML = '<i class="fas fa-times"></i>';
+    }
     if (elements.visualCore) elements.visualCore.classList.add('thinking');
 
     try {
@@ -196,8 +220,9 @@ function processMessage(text, imageId = null) {
         if (imageId) url += `&image_id=${imageId}`;
 
         const eventSource = new EventSource(url);
-        let fullResponse = "";
+        state.currentEventSource = eventSource; // 参照を保持して中断可能に
 
+        let fullResponse = "";
         const messageContent = elements.mioMessage.querySelector('.message-content') || elements.mioMessage;
 
         eventSource.onmessage = (event) => {
@@ -214,8 +239,8 @@ function processMessage(text, imageId = null) {
                 } else if (data.type === "audio") {
                     audioQueue.push(data.content);
                     playNextAudio();
-                } else if (data.type === "usage" || data.usage) {
-                    const usage = data.usage || data.content;
+                } else if (data.type === "usage" && data.data) { // data.data形式に対応
+                    const usage = data.data;
                     const tokenEl = document.getElementById('token-usage');
                     if (tokenEl && usage) {
                         tokenEl.style.display = 'block';
@@ -223,8 +248,14 @@ function processMessage(text, imageId = null) {
                     }
                 } else if (data.type === "end") {
                     eventSource.close();
+                    state.currentEventSource = null;
                     state.isProcessing = false;
-                    if (elements.talkBtn) elements.talkBtn.classList.remove('loading');
+
+                    // UIリセット
+                    if (elements.talkBtn) {
+                        elements.talkBtn.classList.remove('loading');
+                        elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    }
                     if (elements.visualCore) elements.visualCore.classList.remove('thinking');
                     updateStatus("Online");
 
@@ -238,16 +269,23 @@ function processMessage(text, imageId = null) {
         };
 
         eventSource.onerror = () => {
+            console.error("SSE Error occurred.");
             eventSource.close();
+            state.currentEventSource = null;
             state.isProcessing = false;
+
             updateStatus("Error");
-            if (elements.talkBtn) elements.talkBtn.classList.remove('loading');
+            if (elements.talkBtn) {
+                elements.talkBtn.classList.remove('loading');
+                elements.talkBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            }
             if (elements.visualCore) elements.visualCore.classList.remove('thinking');
         };
 
     } catch (e) {
         console.error(e);
         state.isProcessing = false;
+        state.currentEventSource = null;
     }
 }
 
@@ -437,7 +475,11 @@ window.onload = () => {
         elements.userInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 const text = elements.userInput.value.trim();
-                if (text || state.pendingImageId) {
+                if (state.isProcessing) {
+                    // 処理中の場合は中断のみ行う
+                    processMessage(null);
+                    elements.userInput.focus(); // フォーカス戻す
+                } else if (text || state.pendingImageId) {
                     elements.userInput.value = "";
                     processMessage(text, state.pendingImageId);
                     updateImagePreview(null);
