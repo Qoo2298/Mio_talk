@@ -530,27 +530,63 @@ async def compact_memory():
             updates = json.loads(resp.text)
             print(f"Librarian Analysis: {updates}")
             
-            # 3. ファイルへの追記 (memoryフォルダ配下)
-            # USER.md
-            if updates.get("user_updates"):
-                with open("memory/USER.md", "a", encoding="utf-8") as f:
-                    f.write("\n\n<!-- Compacted -->\n")
-                    for item in updates["user_updates"]:
-                        f.write(f"- {item}\n")
-            
-            # IDENTITY.md
-            if updates.get("identity_updates"):
-                 with open("memory/IDENTITY.md", "a", encoding="utf-8") as f:
-                    f.write("\n\n<!-- Compacted -->\n")
-                    for item in updates["identity_updates"]:
-                        f.write(f"- {item}\n")
-            
-            # MEMORY.md
-            if updates.get("memory_updates"):
-                 with open("memory/MEMORY.md", "a", encoding="utf-8") as f:
-                    f.write("\n\n<!-- Compacted -->\n")
-                    for item in updates["memory_updates"]:
-                        f.write(f"- {item}\n")
+            # 3. 編纂AI (Compiler) による情報の統合と更新
+            compiler_model = genai.GenerativeModel('gemini-3-flash-preview')
+
+            async def update_file(filepath, new_info_list, category_name):
+                if not new_info_list: return
+                
+                # 既存の内容を読み込み
+                current_content = ""
+                if os.path.exists(filepath):
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        current_content = f.read()
+                
+                # 統合プロンプト
+                compiler_prompt = f"""
+                あなたは記憶ファイルの編纂者です。
+                以下の「現在のファイル内容」と「新しく判明した情報」を元に、情報を整理・統合して、新しいファイルの内容を作成してください。
+                
+                【現在のファイル内容 ({category_name})】
+                {current_content}
+                
+                【新しく判明した情報】
+                {json.dumps(new_info_list, ensure_ascii=False)}
+                
+                【編集ルール】
+                1. 情報が重複している場合は、一つにまとめてください。
+                2. 新しい情報が既存の情報と矛盾する場合、新しい情報を優先して更新してください。
+                3. 似たような情報は箇条書きでまとめて整理してください。
+                4. 出力はファイルの内容そのもの（Markdown形式）のみを出力してください。余計な説明は不要です。
+                5. ヘッダー（# User Profile など）は維持してください。
+                """
+                
+                try:
+                    # 編纂実行
+                    resp = await asyncio.to_thread(compiler_model.generate_content, compiler_prompt)
+                    new_content = resp.text.strip()
+                    
+                    # トークン計算（加算）
+                    if resp.usage_metadata:
+                        token_usage["prompt_token_count"] += resp.usage_metadata.prompt_token_count
+                        token_usage["candidates_token_count"] += resp.usage_metadata.candidates_token_count
+                        token_usage["total_token_count"] += resp.usage_metadata.total_token_count
+
+                    # 内容が空でないことを確認して書き込み（安全策）
+                    if new_content and len(new_content) > 10:
+                        with open(filepath, "w", encoding="utf-8") as f:
+                            f.write(new_content)
+                        print(f"★ Updated {category_name} Memory (編纂完了)")
+                    else:
+                        print(f"⚠ Warning: Empty response for {category_name}, skipping update.")
+                        
+                except Exception as e:
+                    print(f"Compiler Error ({category_name}): {e}")
+
+            # 各カテゴリごとに更新を実行
+            await update_file("memory/USER.md", updates.get("user_updates"), "User Profile")
+            await update_file("memory/IDENTITY.md", updates.get("identity_updates"), "AI Identity")
+            await update_file("memory/MEMORY.md", updates.get("memory_updates"), "Long Term Memory")
 
             # 4. コンパクション履歴の保存
             summary_text = updates.get("summary", "No summary provided.")
@@ -561,19 +597,19 @@ async def compact_memory():
                 token_usage=token_usage.get("total_token_count", 0),
                 added_memories=updates
             )
+            
+            # 5. 短期記憶の消去 (Compaction成功時のみ)
+            await db.clear_logs()
 
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
             print(f"Compaction Error: {error_detail}")
             return {"status": "error", "message": f"Compaction process failed: {str(e)}"}
-
-    # 5. 短期記憶の消去 (Compaction成功時のみ)
-    await db.clear_logs()
     
     return {
         "status": "ok", 
-        "message": "Compaction complete with Long-Term Memory updates.",
+        "message": "Smart Compaction complete.",
         "updates": updates,
         "token_usage": token_usage
     }
