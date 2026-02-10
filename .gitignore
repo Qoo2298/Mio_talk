@@ -23,6 +23,7 @@ desktop.ini
 node_modules/
 .dist/
 frontend/assets/avatar.jpg
+frontend/assets/icon.png
 
 # --- Memory (Private Data) ---
 memory/*.md
