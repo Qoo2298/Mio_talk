@@ -13,6 +13,11 @@ const state = {
 const ICON_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>';
 const ICON_STOP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"></rect></svg>';
 
+// TTS Mode Icons (SVG)
+const ICON_TTS_LOCAL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+const ICON_TTS_API = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>';
+const ICON_TTS_SILENT = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+
 // Elements Cache
 const elements = {
     mioMessage: document.getElementById('mio-message'),
@@ -424,17 +429,17 @@ window.onload = () => {
         ttsBtn.onclick = () => {
             if (state.ttsMode === "LOCAL") {
                 state.ttsMode = "API";
-                ttsBtn.textContent = "☁️";
+                ttsBtn.innerHTML = ICON_TTS_API;
                 ttsBtn.classList.remove('active');
                 ttsBtn.title = "音声: クラウド";
             } else if (state.ttsMode === "API") {
                 state.ttsMode = "SILENT";
-                ttsBtn.textContent = "🔇";
+                ttsBtn.innerHTML = ICON_TTS_SILENT;
                 ttsBtn.classList.remove('active');
                 ttsBtn.title = "音声: 無言";
             } else {
                 state.ttsMode = "LOCAL";
-                ttsBtn.textContent = "🏠";
+                ttsBtn.innerHTML = ICON_TTS_LOCAL;
                 ttsBtn.classList.add('active');
                 ttsBtn.title = "音声: ローカル";
             }

@@ -259,6 +259,12 @@ header {
     transition: all 0.2s ease;
 }
 
+.ctrl-btn svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
 .ctrl-btn:hover {
     background: var(--gradient-subtle);
     color: var(--accent-purple);
@@ -298,7 +304,8 @@ main {
     align-items: center;
     justify-content: center;
     position: relative;
-    padding-bottom: 140px;
+    padding-bottom: 100px;
+    overflow: hidden;
 }
 
 /* Visual Core */
@@ -517,13 +524,16 @@ main {
 /* ============ FOOTER ============ */
 footer {
     position: fixed;
-    bottom: 24px;
+    bottom: 16px;
+    left: 0;
+    right: 0;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     pointer-events: none;
     z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Image Preview */
@@ -613,6 +623,13 @@ footer {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.action-btn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
 }
 
 .action-btn:hover {
@@ -808,8 +825,16 @@ footer {
 }
 
 .compact-icon {
-    font-size: 2.5rem;
     margin-bottom: 12px;
+    color: var(--accent-purple);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.compact-icon svg {
+    width: 40px;
+    height: 40px;
 }
 
 #compact-modal p {
@@ -941,5 +966,140 @@ footer {
 @media (max-width: 768px) {
     #volume-control-floating {
         display: none !important;
+    }
+
+    header {
+        padding: 10px 12px;
+    }
+
+    .visual-core {
+        width: 200px;
+        height: 200px;
+        margin-bottom: 16px;
+    }
+
+    .avatar-wrapper {
+        width: 150px;
+        height: 150px;
+    }
+
+    .orbit-ring::before {
+        width: 7px;
+        height: 7px;
+    }
+
+    main {
+        padding-bottom: 80px;
+    }
+
+    footer {
+        bottom: 8px;
+    }
+
+    .input-hub {
+        width: 94%;
+        padding: 6px 6px 6px 16px;
+        gap: 4px;
+        border-radius: 40px;
+    }
+
+    .action-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .action-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    #talk-btn {
+        width: 42px;
+        height: 42px;
+    }
+
+    #user-input {
+        font-size: 0.95rem;
+        min-width: 0;
+    }
+
+    .divider-v {
+        height: 20px;
+    }
+
+    .chat-bubble {
+        padding: 14px 18px;
+        font-size: 0.95rem;
+        border-radius: var(--radius-md);
+    }
+
+    .response-layer {
+        padding: 0 12px;
+    }
+
+    .status-pill {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .status-text {
+        font-size: 0.6rem;
+    }
+
+    .control-group {
+        padding: 4px;
+        gap: 2px;
+    }
+
+    .ctrl-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .ctrl-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #token-usage {
+        font-size: 0.55rem;
+        padding: 4px 8px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 380px) {
+    .input-hub {
+        padding: 4px 4px 4px 12px;
+        gap: 2px;
+    }
+
+    .action-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .action-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #talk-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    #user-input {
+        font-size: 0.9rem;
+    }
+
+    .visual-core {
+        width: 160px;
+        height: 160px;
+    }
+
+    .avatar-wrapper {
+        width: 120px;
+        height: 120px;
     }
 }

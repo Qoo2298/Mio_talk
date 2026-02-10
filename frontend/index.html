@@ -45,9 +45,31 @@
                     <span class="status-text" id="system-status-text">Online</span>
                 </div>
                 <div class="control-group">
-                    <button id="tts-mode-btn" class="ctrl-btn active" title="音声: ローカル">🏠</button>
-                    <button id="logs-btn" class="ctrl-btn" title="履歴">📜</button>
-                    <button id="compact-btn" class="ctrl-btn" title="記憶整理">🧠</button>
+                    <button id="tts-mode-btn" class="ctrl-btn active" title="音声: ローカル">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                    </button>
+                    <button id="logs-btn" class="ctrl-btn" title="履歴">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </button>
+                    <button id="compact-btn" class="ctrl-btn" title="記憶整理">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                            </path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </header>
@@ -90,7 +112,16 @@
 
         <div id="compact-modal">
             <div class="modal-content">
-                <div class="compact-icon">🧠</div>
+                <div class="compact-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
                 <p>記憶をコンパクト化する？</p>
                 <p class="compact-desc">短期記憶が整理され、大切な情報が長期記憶に保存されます</p>
                 <div class="compact-buttons">
@@ -114,9 +145,24 @@
             </div>
 
             <div class="input-hub">
-                <button id="cam-btn" title="カメラ" class="action-btn">📷</button>
+                <button id="cam-btn" title="カメラ" class="action-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                        </path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                </button>
                 <div class="divider-v"></div>
-                <button id="mic-toggle" title="マイク" class="action-btn">🎙️</button>
+                <button id="mic-toggle" title="マイク" class="action-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                </button>
                 <input type="text" id="user-input" placeholder="メッセージを入力..." autocomplete="off">
                 <button id="talk-btn" title="送信">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
