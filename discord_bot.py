@@ -101,6 +101,10 @@ async def on_message(message: discord.Message):
             # === 最終確定 ===
             final_text = full_text + token_info_str
             
+            if not final_text:
+                print("⚠️ Warning: Final text is empty. Nothing to send.")
+                return
+
             # 2000文字を超える場合の分割送信
             if len(final_text) > 2000:
                 # 最初のメッセージを上限まで埋める
@@ -150,38 +154,36 @@ async def call_mio_streaming_generator(text: str):
                     line = line.strip()
                     if not line:
                         continue # 空行スキップ
-                    
-                    # print(f"DEBUG Line: {line[:50]}...") # デバッグ用
 
-                if line.startswith("data: "):
-                    data_str = line[6:]
-                    try:
-                        data = json.loads(data_str)
-                        
-                        if data.get("type") == "chunk":
-                            content = data.get("content", "")
-                            if content:
-                                yield {"type": "content", "data": content}
-                        
-                        # 新しい形式 {'type': 'usage', 'data': {...}} に対応
-                        elif data.get("type") == "usage":
-                            token_usage = data.get("data")
-                            yield {"type": "usage", "data": token_usage}
-                        
-                        # 古い形式互換（念のため）
-                        elif data.get("usage"):
-                            yield {"type": "usage", "data": data.get("usage")}
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        try:
+                            data = json.loads(data_str)
+
+                            if data.get("type") == "chunk":
+                                content = data.get("content", "")
+                                if content:
+                                    yield {"type": "content", "data": content}
                             
-                        elif data.get("type") == "end":
-                            return
-                        
-                        elif data.get("error"):
-                            print(f"API Error: {data.get('error')}")
-                            yield {"type": "content", "data": f"\n[Error: {data.get('error')}]"}
+                            # 新しい形式 {'type': 'usage', 'data': {...}} に対応
+                            elif data.get("type") == "usage":
+                                token_usage = data.get("data")
+                                yield {"type": "usage", "data": token_usage}
                             
-                    except json.JSONDecodeError as e:
-                        print(f"JSON Error: {e} in {data_str}")
-                        continue
+                            # 古い形式互換（念のため）
+                            elif data.get("usage"):
+                                yield {"type": "usage", "data": data.get("usage")}
+                                
+                            elif data.get("type") == "end":
+                                return
+                            
+                            elif data.get("error"):
+                                print(f"API Error: {data.get('error')}")
+                                yield {"type": "content", "data": f"\n[Error: {data.get('error')}]"}
+                                
+                        except json.JSONDecodeError as e:
+                            print(f"JSON Error: {e} in {data_str}")
+                            continue
                             
             # ループ終了後
             print("Stream finished.")
