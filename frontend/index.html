@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MIO - Your AI Partner">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MIO">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="assets/avatar.jpg">
+
+    <title>MIO v4.0</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Start Overlay -->
+        <div id="start-overlay">
+            <div class="overlay-content">
+                <div class="overlay-avatar">
+                    <img src="assets/avatar.jpg" alt="MIO">
+                </div>
+                <h1>MIO</h1>
+                <p class="overlay-subtitle">Your AI Partner</p>
+                <div class="overlay-hint">
+                    <span class="pulse-dot"></span>
+                    Click anywhere to start
+                </div>
+            </div>
+        </div>
+
+        <!-- Header - Minimal Design -->
+        <header>
+            <div id="token-usage"></div>
+            <div class="header-controls">
+                <div class="status-pill">
+                    <div class="status-dot"></div>
+                    <span class="status-text" id="system-status-text">Online</span>
+                </div>
+                <div class="control-group">
+                    <button id="tts-mode-btn" class="ctrl-btn active" title="音声: ローカル">🏠</button>
+                    <button id="logs-btn" class="ctrl-btn" title="履歴">📜</button>
+                    <button id="compact-btn" class="ctrl-btn" title="記憶整理">🧠</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div class="visual-core">
+                <div class="orbit-ring"></div>
+                <div class="avatar-wrapper">
+                    <div class="avatar-main">
+                        <img src="assets/avatar.jpg" alt="MIO">
+                    </div>
+                </div>
+            </div>
+
+            <div class="response-layer">
+                <div id="chat-display">
+                    <div id="mio-message" class="chat-bubble assistant">
+                        <div class="role-label">MIO</div>
+                        <div class="message-content">接続完了。スタンバイOKです、マスター。</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <div id="image-modal" onclick="this.style.display='none'">
+            <img id="full-image" src="" alt="Full View">
+        </div>
+
+        <div id="logs-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>💬 会話履歴</h3>
+                    <button id="close-logs">×</button>
+                </div>
+                <div id="logs-content"></div>
+            </div>
+        </div>
+
+        <div id="compact-modal">
+            <div class="modal-content">
+                <div class="compact-icon">🧠</div>
+                <p>記憶をコンパクト化する？</p>
+                <p class="compact-desc">短期記憶が整理され、大切な情報が長期記憶に保存されます</p>
+                <div class="compact-buttons">
+                    <button id="confirm-compact">実行</button>
+                    <button id="cancel-compact">やめる</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Control -->
+        <div id="volume-control-floating">
+            <span class="volume-icon">🔊</span>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div id="image-preview-area">
+                <img id="preview-thumb" src="" alt="preview" onclick="showFullImage(this.src)">
+                <button id="clear-image-btn">✕</button>
+            </div>
+
+            <div class="input-hub">
+                <button id="cam-btn" title="カメラ" class="action-btn">📷</button>
+                <div class="divider-v"></div>
+                <button id="mic-toggle" title="マイク" class="action-btn">🎙️</button>
+                <input type="text" id="user-input" placeholder="メッセージを入力..." autocomplete="off">
+                <button id="talk-btn" title="送信">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 2L11 13"></path>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>

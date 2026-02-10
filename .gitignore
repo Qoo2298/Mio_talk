@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# --- Environment / API Keys ---
+.env
+
+# --- Database / Logs ---
+*.db
+*.log
+sqlite-vec/
+
+# --- OS / IDE ---
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Frontend ---
+node_modules/
+.dist/
+frontend/assets/avatar.jpg
+
+# --- Memory (Private Data) ---
+memory/*.md
+!memory/SAMPLE_MEMORY.md
+!memory/README.md
+
+# --- Temp / Sensitive ---
+test_snapshot.jpg
+test_tapo.py
+find_tapo.py

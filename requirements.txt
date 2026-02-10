@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+google-generativeai
+python-dotenv
+httpx
+opencv-python-headless
+requests
+aiosqlite
+discord.py

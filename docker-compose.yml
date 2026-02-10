@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  mio-backend:
+    build: .
+    container_name: mio-v4-app
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.env:/app/.env
+      - ./memory:/app/memory
+      - ./mio_memory.db:/app/mio_memory.db
+    dns:
+      - 8.8.8.8
+    environment:
+      - TZ=Asia/Tokyo
+      - GEMINI_API_KEY
+      - AIVIS_CLOUD_KEY
+      - TTS_MODE
+    # ラズパイのカメラ（/dev/video0など）を使う場合は、ここにdevice設定を追加することになるかもしれません
+    # 今回はTapo（IPカメラ）なので不要ですが、一応メモです。
