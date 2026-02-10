@@ -457,8 +457,78 @@ window.onload = () => {
     }
 
     // Camera
+    // Camera Menu Logic
+    const cameraMenu = document.getElementById('camera-menu');
+    const camUploadBtn = document.getElementById('cam-upload-btn');
+    const camTapoBtn = document.getElementById('cam-tapo-btn');
+    const fileInput = document.getElementById('file-input');
+
     if (elements.camBtn) {
-        elements.camBtn.onclick = async () => {
+        elements.camBtn.onclick = (e) => {
+            e.stopPropagation(); // バブリング防止
+            if (cameraMenu) {
+                const isVisible = cameraMenu.style.display === 'flex';
+                cameraMenu.style.display = isVisible ? 'none' : 'flex';
+            }
+        };
+    }
+
+    // 画面外クリックでメニューを閉じる
+    document.addEventListener('click', (e) => {
+        if (cameraMenu && cameraMenu.style.display === 'flex' && !cameraMenu.contains(e.target) && e.target !== elements.camBtn) {
+            cameraMenu.style.display = 'none';
+        }
+    });
+
+    // 1. 画像アップロード処理
+    if (camUploadBtn && fileInput) {
+        camUploadBtn.onclick = () => {
+            fileInput.click();
+            if (cameraMenu) cameraMenu.style.display = 'none';
+        };
+
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            updateStatus("読み込み中...");
+            const reader = new FileReader();
+
+            reader.onload = async (e) => {
+                const base64Data = e.target.result.split(',')[1]; // data:image/jpeg;base64,... のスキームを除く
+
+                try {
+                    updateStatus("アップロード中...");
+                    const upRes = await fetch('/api/upload_image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64Data })
+                    });
+                    const upData = await upRes.json();
+                    if (upData.status !== "ok") throw new Error("Upload failed");
+
+                    state.pendingImageId = upData.image_id;
+                    updateImagePreview(base64Data);
+                    updateStatus("画像準備OK");
+
+                    // Inputをクリア（同じファイルを再選択できるように）
+                    fileInput.value = "";
+
+                } catch (err) {
+                    console.error(err);
+                    updateStatus("Error");
+                    alert("アップロード失敗: " + err.message);
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
+    // 2. Tapoカメラ処理 (既存ロジックの移植)
+    if (camTapoBtn) {
+        camTapoBtn.onclick = async () => {
+            if (cameraMenu) cameraMenu.style.display = 'none';
+
             updateStatus("撮影中...");
             try {
                 const snapRes = await fetch('/api/camera/snapshot');
