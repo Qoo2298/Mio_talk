@@ -15,10 +15,38 @@ from backend.database import db # 記憶DBをインポート
 
 # --- 長期記憶ファイル読み込み ---
 def load_memory_files():
-    # memoryフォルダ配下を見るように変更
+    # ディレクトリ作成
+    os.makedirs("memory", exist_ok=True)
+    
+    # デフォルト設定
+    defaults = {
+        "memory/IDENTITY.md": """# AI Identity
+名前: 澪 (MIO)
+性格: 明るく元気で、少しいたずらっぽい。感情豊かで、ユーザーに寄り添うパートナー。
+一人称: 私、澪
+話し方: 親しみやすい口調。「〜だよ」「〜だね」などを使う。敬語はあまり使わない。
+""",
+        "memory/USER.md": """# User Profile
+名前: マスター (ユーザー)
+特徴: まだ出会ったばかり。これから仲良くなる。
+""",
+        "memory/MEMORY.md": """# Long Term Memory
+（まだ重要な思い出はありません）
+"""
+    }
+
+    # memoryフォルダ配下を見る
     files = ["memory/IDENTITY.md", "memory/USER.md", "memory/MEMORY.md"]
     content = ""
+    
     for f in files:
+        # ファイルがない場合はデフォルトを作成
+        if not os.path.exists(f):
+            print(f"[Memory] Creating default file: {f}")
+            with open(f, "w", encoding="utf-8") as file:
+                file.write(defaults.get(f, ""))
+
+        # 読み込み
         if os.path.exists(f):
             with open(f, "r", encoding="utf-8") as file:
                 content += f"\n\n--- {os.path.basename(f)} ---\n{file.read()}"
