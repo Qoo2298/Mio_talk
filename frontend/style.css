@@ -495,7 +495,15 @@ main {
 }
 
 .volume-icon {
-    font-size: 1.1rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.volume-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 #volume-slider {
@@ -759,59 +767,74 @@ footer {
 }
 
 /* History Items */
+/* History Items (LINE Style) */
 .history-item {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: var(--radius-md);
-    margin-bottom: 8px;
-    transition: background 0.2s;
-}
-
-.history-item:hover {
-    background: rgba(139, 92, 246, 0.05);
+    flex-direction: column;
+    margin-bottom: 12px;
+    max-width: 80%;
+    /* 幅を少し制限 */
+    width: fit-content;
+    /* 中身に合わせる */
+    position: relative;
+    padding: 10px 14px;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 .history-item.assistant {
-    background: rgba(139, 92, 246, 0.06);
+    align-self: flex-start;
+    background: white;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-bottom-left-radius: 4px;
+    margin-right: auto;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: left;
+}
+
+.history-item.user {
+    align-self: flex-end;
+    background: var(--gradient-main);
+    color: white;
+    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.2);
+    border-bottom-right-radius: 4px;
+    margin-left: auto;
+    text-align: left;
+    /* テキストは左揃えに戻す */
 }
 
 .history-icon {
-    font-size: 1.2rem;
-    flex-shrink: 0;
+    display: none;
+    /* アイコン削除 */
 }
 
 .history-text {
     flex: 1;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: var(--text-primary);
 }
 
 .history-play {
-    width: 32px;
-    height: 32px;
+    position: absolute;
+    right: -36px;
+    bottom: 0;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: none;
-    background: var(--gradient-main);
-    color: white;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
     cursor: pointer;
-    font-size: 0.9rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
+    font-size: 0.8rem;
     transition: all 0.2s;
-    flex-shrink: 0;
-}
-
-.history-item:hover .history-play {
-    opacity: 1;
 }
 
 .history-play:hover {
-    transform: scale(1.1);
+    background: var(--accent-purple);
+    color: white;
 }
 
 /* Compact Modal */
@@ -969,38 +992,145 @@ footer {
     }
 
     header {
-        padding: 10px 12px;
+        padding: 12px 16px;
     }
 
+    /* Main Layout Correction */
+    main {
+        padding-bottom: 120px;
+        /* Footerの高さを考慮 */
+        justify-content: center;
+        /* ど真ん中に戻す */
+        padding-top: 0;
+        margin-top: -60px;
+        /* さらに上に */
+    }
+
+    /* Avatar adjustments */
     .visual-core {
-        width: 200px;
-        height: 200px;
-        margin-bottom: 16px;
+        width: 260px;
+        /* もっと大きく */
+        height: 260px;
+        margin-bottom: 20px;
+        flex-shrink: 0;
     }
 
     .avatar-wrapper {
-        width: 150px;
-        height: 150px;
+        width: 200px;
+        height: 200px;
     }
 
-    .orbit-ring::before {
-        width: 7px;
-        height: 7px;
+    /* Message Bubble - More readable */
+    .response-layer {
+        padding: 0 16px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
     }
 
-    main {
-        padding-bottom: 80px;
+    .chat-bubble {
+        padding: 16px 20px;
+        font-size: 1rem;
+        /* 文字サイズUP */
+        border-radius: var(--radius-md);
+        max-height: 35vh;
+        overflow-y: auto;
+        width: 100%;
+        /* 横幅いっぱい使う */
+        max-width: 100%;
     }
 
+    /* Footer & Input Area */
     footer {
-        bottom: 8px;
+        bottom: 24px;
+        /* 入力欄をもうちょい上に */
     }
 
     .input-hub {
-        width: 94%;
-        padding: 6px 6px 6px 16px;
+        width: 92%;
+        /* 左右に少し余裕を持たせる */
+        padding: 8px 12px;
+        /* 余白調整 */
+        gap: 8px;
+        border-radius: 50px;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        display: flex;
+        align-items: center;
+        /* はみ出し防止 */
+        box-sizing: border-box;
+    }
+
+    /* Buttons - Mobile Optimized */
+    .action-btn {
+        width: 40px;
+        /* 少し戻す */
+        height: 40px;
+        flex-shrink: 0;
+    }
+
+    .action-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    #talk-btn {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        margin-left: auto;
+        /* 右端に寄せる */
+    }
+
+    #talk-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    #user-input {
+        font-size: 16px;
+        height: 40px;
+        flex: 1;
+        /* 余ったスペースを埋める */
+        min-width: 0;
+        /* Flexboxでの縮小許可 */
+    }
+
+    /* Header Controls */
+    .status-pill {
+        padding: 6px 12px;
+    }
+
+    .status-text {
+        font-size: 0.7rem;
+    }
+
+    .ctrl-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    .ctrl-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 380px) {
+    .visual-core {
+        width: 180px;
+        height: 180px;
+    }
+
+    .avatar-wrapper {
+        width: 140px;
+        height: 140px;
+    }
+
+    .input-hub {
+        padding: 6px 8px;
         gap: 4px;
-        border-radius: 40px;
     }
 
     .action-btn {
@@ -1008,98 +1138,8 @@ footer {
         height: 36px;
     }
 
-    .action-btn svg {
-        width: 18px;
-        height: 18px;
-    }
-
     #talk-btn {
-        width: 42px;
-        height: 42px;
-    }
-
-    #user-input {
-        font-size: 0.95rem;
-        min-width: 0;
-    }
-
-    .divider-v {
-        height: 20px;
-    }
-
-    .chat-bubble {
-        padding: 14px 18px;
-        font-size: 0.95rem;
-        border-radius: var(--radius-md);
-    }
-
-    .response-layer {
-        padding: 0 12px;
-    }
-
-    .status-pill {
-        padding: 6px 10px;
-        gap: 6px;
-    }
-
-    .status-text {
-        font-size: 0.6rem;
-    }
-
-    .control-group {
-        padding: 4px;
-        gap: 2px;
-    }
-
-    .ctrl-btn {
-        width: 32px;
-        height: 32px;
-    }
-
-    .ctrl-btn svg {
-        width: 16px;
-        height: 16px;
-    }
-
-    #token-usage {
-        font-size: 0.55rem;
-        padding: 4px 8px;
-    }
-}
-
-/* Extra small devices */
-@media (max-width: 380px) {
-    .input-hub {
-        padding: 4px 4px 4px 12px;
-        gap: 2px;
-    }
-
-    .action-btn {
-        width: 32px;
-        height: 32px;
-    }
-
-    .action-btn svg {
-        width: 16px;
-        height: 16px;
-    }
-
-    #talk-btn {
-        width: 38px;
-        height: 38px;
-    }
-
-    #user-input {
-        font-size: 0.9rem;
-    }
-
-    .visual-core {
-        width: 160px;
-        height: 160px;
-    }
-
-    .avatar-wrapper {
-        width: 120px;
-        height: 120px;
+        width: 40px;
+        height: 40px;
     }
 }

@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MIO">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="apple-touch-icon" href="assets/avatar.jpg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/avatar.jpg">
 
     <title>MIO v4.0</title>
     <link rel="stylesheet" href="style.css?v=2">
@@ -103,7 +103,7 @@
         <div id="logs-modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>💬 会話履歴</h3>
+                    <h3>会話履歴</h3>
                     <button id="close-logs">×</button>
                 </div>
                 <div id="logs-content"></div>
@@ -133,7 +133,13 @@
 
         <!-- Volume Control -->
         <div id="volume-control-floating">
-            <span class="volume-icon">🔊</span>
+            <span class="volume-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+            </span>
             <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
         </div>
 

@@ -310,7 +310,7 @@ async function showHistory() {
 
     // Update modal title for conversation history
     const modalHeader = elements.logsModal.querySelector('.modal-header h3');
-    if (modalHeader) modalHeader.textContent = '💬 会話履歴';
+    if (modalHeader) modalHeader.textContent = '会話履歴';
 
     elements.logsContent.innerHTML = '<p style="text-align:center; color:#9ca3af; padding:40px;">読み込み中...</p>';
 
@@ -326,17 +326,16 @@ async function showHistory() {
         }
 
         let html = '';
-        // Reverse to show oldest first
+        // Reverse to show oldest first (Top) -> newest last (Bottom)
+        // API returns [newest, ..., oldest] usually, so reverse needed for chronological order
         const logs = [...data.logs].reverse();
 
         logs.forEach(log => {
             const isMio = log.role === 'assistant';
-            const icon = isMio ? '🤖' : '👤';
             const escapedContent = log.content.replace(/'/g, "\\'").replace(/\n/g, ' ');
 
             html += `
                 <div class="history-item ${isMio ? 'assistant' : 'user'}">
-                    <span class="history-icon">${icon}</span>
                     <span class="history-text">${log.content}</span>
                     ${isMio ? `<button class="history-play" onclick="speakText('${escapedContent}')" title="再生">▶</button>` : ''}
                 </div>
@@ -344,6 +343,11 @@ async function showHistory() {
         });
 
         elements.logsContent.innerHTML = html;
+
+        // Scroll to bottom
+        setTimeout(() => {
+            elements.logsContent.scrollTop = elements.logsContent.scrollHeight;
+        }, 100);
 
     } catch (e) {
         elements.logsContent.innerHTML = `<p style="text-align:center; color:#ef4444; padding:40px;">エラー: ${e.message}</p>`;
@@ -357,7 +361,7 @@ async function showCompactionLogs() {
 
     // Update modal title
     const modalHeader = elements.logsModal.querySelector('.modal-header h3');
-    if (modalHeader) modalHeader.textContent = '🧠 記憶コンパクション履歴';
+    if (modalHeader) modalHeader.textContent = '記憶コンパクション履歴';
 
     elements.logsContent.innerHTML = '<p style="text-align:center; color:#9ca3af; padding:40px;">読み込み中...</p>';
 
@@ -380,13 +384,13 @@ async function showCompactionLogs() {
             try { updates = JSON.parse(log.added_memories || "{}"); } catch (e) { }
 
             if (updates.user_updates && updates.user_updates.length > 0) {
-                updatesHtml += `<div class="compact-update"><strong>👤 User:</strong> ${updates.user_updates.join(", ")}</div>`;
+                updatesHtml += `<div class="compact-update"><strong>User:</strong> ${updates.user_updates.join(", ")}</div>`;
             }
             if (updates.identity_updates && updates.identity_updates.length > 0) {
-                updatesHtml += `<div class="compact-update"><strong>🤖 Identity:</strong> ${updates.identity_updates.join(", ")}</div>`;
+                updatesHtml += `<div class="compact-update"><strong>Identity:</strong> ${updates.identity_updates.join(", ")}</div>`;
             }
             if (updates.memory_updates && updates.memory_updates.length > 0) {
-                updatesHtml += `<div class="compact-update"><strong>🧠 Memory:</strong> ${updates.memory_updates.join(", ")}</div>`;
+                updatesHtml += `<div class="compact-update"><strong>Memory:</strong> ${updates.memory_updates.join(", ")}</div>`;
             }
 
             html += `

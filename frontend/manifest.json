@@ -1,8 +1,8 @@
 {
     "name": "MIO - Your AI Partner",
     "short_name": "MIO",
-    "theme_color": "#000000",
-    "background_color": "#000000",
+    "theme_color": "#f8f9fc",
+    "background_color": "#f8f9fc",
     "display": "standalone",
     "start_url": "./",
     "scope": "./",
@@ -10,12 +10,14 @@
         {
             "src": "assets/avatar.jpg",
             "sizes": "192x192",
-            "type": "image/jpeg"
+            "type": "image/jpeg",
+            "purpose": "any maskable"
         },
         {
             "src": "assets/avatar.jpg",
             "sizes": "512x512",
-            "type": "image/jpeg"
+            "type": "image/jpeg",
+            "purpose": "any maskable"
         }
     ]
 }
