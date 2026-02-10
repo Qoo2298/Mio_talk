@@ -2,6 +2,9 @@
 
 あなたの日常に寄り添い、共に成長し、記憶を紡ぐパートナーAI。  
 Windows PCからRaspberry Piまで、そして**お手元のスマートフォンからいつでもどこでも**、あなたのライフスタイルに合わせて存在します。
+![IMG_6565](https://github.com/user-attachments/assets/5d70bef2-e983-4449-9e7c-abf632698f86)
+<img width="603" height="1311" alt="IMG_6566" src="https://github.com/user-attachments/assets/065c4519-3394-4b52-83a1-343e5ff01bdf" />
+<img width="603" height="1311" alt="IMG_6567" src="https://github.com/user-attachments/assets/65f6fb7a-01ef-43a9-9ae9-3efac06daec9" />
 
 ---
 
