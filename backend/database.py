@@ -97,16 +97,23 @@ class ConversationDB:
             await db.commit()
             print(f"[DB] Logged: {role} -> {content[:20]}... (Vec: {'Yes' if embedding else 'No'})")
 
-    async def get_recent_context(self, limit=10):
-        """直近の会話履歴を取得する（古い順に並べて返す）"""
+    async def get_recent_context(self, limit=10, since_id=0):
+        """直近の会話履歴を取得する（古い順に並べて返す）。since_id > 0 の場合はそれより後のメッセージのみ返す"""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
-                "SELECT role, content FROM conversation_logs ORDER BY id DESC LIMIT ?",
-                (limit,)
+                "SELECT role, content FROM conversation_logs WHERE id > ? ORDER BY id DESC LIMIT ?",
+                (since_id, limit)
             ) as cursor:
                 rows = await cursor.fetchall()
                 # 取得時は新しい順なので、逆転させて古い順（時系列）にする
                 return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+
+    async def get_max_id(self):
+        """現在の最大メッセージIDを返す（新セッション開始点の記録用）"""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT MAX(id) FROM conversation_logs") as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row[0] is not None else 0
     
     async def search_similar_context(self, query_vector, limit=3, threshold=0.6):
         """ベクトル類似度検索（Cosine Similarity）"""

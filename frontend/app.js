@@ -191,6 +191,17 @@ function updateStatus(text) {
     if (elements.systemStatusText) elements.systemStatusText.textContent = text;
 }
 
+async function startNewSession() {
+    try {
+        await fetch('/api/new_session', { method: 'POST' });
+        const messageContent = elements.mioMessage.querySelector('.message-content') || elements.mioMessage;
+        messageContent.textContent = "--- 新しいセッションを開始したよ！過去の会話は参照しないね ---";
+        updateStatus("New Session");
+    } catch (e) {
+        console.error("New session error:", e);
+    }
+}
+
 function processMessage(text, imageId = null) {
     if (state.isProcessing && state.currentEventSource) {
         // --- 中断処理 (Stop) ---
@@ -567,6 +578,9 @@ window.onload = () => {
                     // 処理中の場合は中断のみ行う
                     processMessage(null);
                     elements.userInput.focus(); // フォーカス戻す
+                } else if (text === '/new') {
+                    elements.userInput.value = "";
+                    startNewSession();
                 } else if (text || state.pendingImageId) {
                     elements.userInput.value = "";
                     processMessage(text, state.pendingImageId);
@@ -584,7 +598,10 @@ window.onload = () => {
                 return;
             }
             const text = elements.userInput.value.trim();
-            if (text || state.pendingImageId) {
+            if (text === '/new') {
+                elements.userInput.value = "";
+                startNewSession();
+            } else if (text || state.pendingImageId) {
                 elements.userInput.value = "";
                 processMessage(text, state.pendingImageId);
                 updateImagePreview(null);

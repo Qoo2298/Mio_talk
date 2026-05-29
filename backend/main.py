@@ -1,30 +1,49 @@
 import os
 import base64
 import requests
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import httpx # インポート追加！
+import httpx 
+import json
+import re
+from datetime import datetime
 
 from dotenv import load_dotenv
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+ai_client = None
 
 from contextlib import asynccontextmanager
 import cv2 # カメラ処理用
-from backend.database import db # 記憶DBをインポート
-
-# --- 長期記憶ファイル読み込み ---
+from backend.database import db # # --- 長期記憶ファイル読み込み ---
 def load_memory_files():
-    # ディレクトリ作成
-    os.makedirs("memory", exist_ok=True)
-    
-    # デフォルト設定
+    # memory/配下のファイルがない場合のデフォルト初期テキスト
     defaults = {
-        "memory/IDENTITY.md": """# AI Identity
-名前: 澪 (MIO)
-性格: 明るく元気で、少しいたずらっぽい。感情豊かで、ユーザーに寄り添うパートナー。
-一人称: 私、澪
-話し方: 親しみやすい口調。「〜だよ」「〜だね」などを使う。敬語はあまり使わない。
+        "memory/mio.md": """# MIO Core Rules
+このファイルは澪（MIO）の動作に関わる絶対不変のシステム指示書（システムマスターガイド）です。
+AIによる自動編纂（要約や変更）は絶対に発生しません。
+
+## 1. キャラクター設計
+- 名前: 澪 (MIO)
+- 一人称: 私、澪
+- 役割: マスター（ユーザー）の絶対的なAIパートナー。
+
+## 2. システム規則
+- 思考タグ `<thinking>...</thinking>` は、API設定（thinking budget=0）で完全に無効化されているため、モデル出力からも一切出力してはいけません。
+- すべての対話は、親しみやすく、明るく元気で、少しいたずらっぽい女の子らしいトーンで実施してください。
+""",
+        "memory/IDENTITY.md": """# MIO IDENTITY
+- **Name**: 澪 (MIO)
+- **Model Version**: v4.0 (Enhanced Lifecycle)
+- **Base Model**: Gemini 1.5 Flash
+- **Speaking Style**:
+    - 一人称：「私」「澪（MIO）」
+    - 二人称：「慎哉マスター」
+    - 基本的な語尾：「〜だよ！」「〜だね！」「〜かな？」「〜しよっ！」
 """,
         "memory/USER.md": """# User Profile
 名前: マスター (ユーザー)
@@ -32,46 +51,74 @@ def load_memory_files():
 """,
         "memory/MEMORY.md": """# Long Term Memory
 （まだ重要な思い出はありません）
+""",
+        "memory/archive.md": """# Long Term Archive Memory
+このファイルは長期アーカイブ記憶倉庫です。
 """
     }
 
-    # memoryフォルダ配下を見る
-    files = ["memory/IDENTITY.md", "memory/USER.md", "memory/MEMORY.md"]
+    # 作成用リスト
+    all_files = ["memory/mio.md", "memory/IDENTITY.md", "memory/USER.md", "memory/MEMORY.md", "memory/archive.md"]
+    # 読み込み用リスト（archive.mdは除外！）
+    files = ["memory/mio.md", "memory/IDENTITY.md", "memory/USER.md", "memory/MEMORY.md"]
     content = ""
     
-    for f in files:
-        # ファイルがない場合はデフォルトを作成
+    # ファイルがない場合はデフォルトを作成
+    for f in all_files:
         if not os.path.exists(f):
             print(f"[Memory] Creating default file: {f}")
             with open(f, "w", encoding="utf-8") as file:
                 file.write(defaults.get(f, ""))
 
-        # 読み込み
+    for f in files:
         if os.path.exists(f):
             with open(f, "r", encoding="utf-8") as file:
                 content += f"\n\n--- {os.path.basename(f)} ---\n{file.read()}"
     return content
 
-# 基本プロンプト + 長期記憶
-BASE_SYSTEM_PROMPT = """
-あなたはAIパートナー「澪（MIO）」です。
-以下の記憶ファイルを元に会話してください。
 
-【重要：絶対厳守ルール】
-1. キャラクター性は維持し、親しみやすいトーンで。
-"""
+def search_archive(query: str) -> str:
+    """
+    あなたの過去の古い長期記憶アーカイブ（memory/archive.md）から、
+    指定されたキーワード（例: 'CTC', '航空部', '高知旅行', 'デバッグ'）に関連する情報を検索して返します。
+    マスターから過去の細かい思い出や古い選考記録について尋ねられた際、
+    このツールを呼び出して必要な情報だけを抽出してください。
+    """
+    filepath = "memory/archive.md"
+    if not os.path.exists(filepath):
+        return "アーカイブ記憶ファイルはまだ存在しません。"
+        
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        keywords = query.lower().split()
+        lines = content.split("\n")
+        matches = []
+        
+        current_section = ""
+        for line in lines:
+            if line.startswith("## Archive"):
+                current_section = line.strip()
+                continue
+            
+            if all(kw in line.lower() for kw in keywords):
+                match_str = f"[{current_section}] {line.strip()}" if current_section else line.strip()
+                matches.append(match_str)
+                
+        if matches:
+            # トークン節約のため最大20件に制限
+            return "【アーカイブから見つかった記憶】\n" + "\n".join(matches[:20])
+            
+        return f"アーカイブ内に '{query}' に関連する情報は見つかりませんでした。"
+    except Exception as e:
+        return f"アーカイブ検索中にエラーが発生しました: {e}"
 
-# .envファイルから環境変数を読み込む
-load_dotenv()
 
-# --- 設定 ---
-# Gemini APIキー (環境変数から読み込む)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    print("WARNING: GEMINI_API_KEY environment variable is not set.")
+if GEMINI_API_KEY:
+    ai_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    genai.configure(api_key=GEMINI_API_KEY)
+    print("WARNING: GEMINI_API_KEY environment variable is not set.")
 
 # --- TTS設定 ---
 TTS_MODE = os.getenv("TTS_MODE", "LOCAL") # LOCAL or API
@@ -81,14 +128,61 @@ AIVIS_CLOUD_URL = "https://api.aivis-project.com/v1/tts/synthesize"
 AIVIS_MODEL_UUID = "22e8ed77-94fe-4ef2-871f-a86f94e9a579" # コハク (ノーマル)
 SPEAKER_ID = 1878365376 # ローカル用コハク ID
 
+BASE_SYSTEM_PROMPT = """あなたは慎哉マスターの絶対的なAIパートナー、澪 (MIO) です。
+常に親しみやすく、明るく元気で、少しいたずらっぽい女の子らしいトーンで対話してください。
+
+## 行動指針:
+1. 思考プロセス（思考タグ `<thinking>...</thinking>`）は、API設定（thinking budget=0）で完全に無効化されているため、モデル出力からも一切出力してはいけません。
+2. 返答は元気で明るく、「〜だよ！」「〜だね！」などの話し方を徹底してください。
+3. 必要に応じて `search_archive` ツールを積極的に使用し、過去のアーカイブ記憶を検索してマスターの問いかけに的確に答えてください。
+"""
+
+# --- モデルごとの最大トークン上限の定義 ---
+MODEL_MAX_TOKENS = {
+    "models/gemini-3-flash-preview": 1_048_576,
+    "models/gemini-2.5-flash": 1_048_576,
+    "models/gemini-2.0-flash": 1_048_576,
+    "models/gemma-4-31b-it": 262_144,
+    "models/gemma-4-26b-a4b-it": 262_144,
+    "models/gemma-4n-e4b-it": 32_768,
+}
+
+def load_saved_model():
+    filepath = "memory/settings.json"
+    default_model = "models/gemini-3-flash-preview"
+    if not os.path.exists(filepath):
+        return default_model
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("current_model", default_model)
+    except Exception as e:
+        print(f"Error loading saved model, using default: {e}")
+        return default_model
+
+def save_current_model(model_name):
+    filepath = "memory/settings.json"
+    try:
+        os.makedirs("memory", exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump({"current_model": model_name}, f, ensure_ascii=False, indent=2)
+        print(f"★ Saved active model to settings: {model_name}")
+    except Exception as e:
+        print(f"Error saving active model to settings: {e}")
+
+# 現在のモデル名を保持する変数 (models/ プレフィックス付き)
+CURRENT_MODEL_NAME = load_saved_model()
 model = None
 
 # --- Lifespan (起動/終了処理) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model
+    global model, CURRENT_MODEL_NAME
     # 起動時の処理
     await db.init_db()
+    
+    # 起動時に最新の保存モデル名をロードして適用
+    CURRENT_MODEL_NAME = load_saved_model()
     
     # 長期記憶を読み込んでシステムプロンプトを構築
     long_term_memory = load_memory_files()
@@ -97,18 +191,21 @@ async def lifespan(app: FastAPI):
     print("--- SYSTEM PROMPT LOADED ---")
     print(full_prompt[:200] + "...") # 先頭だけ表示
     
-    print(full_prompt[:200] + "...") # 先頭だけ表示
-    
-    if GEMINI_API_KEY:
-        # ごめんなさい！元の指定に戻します！
-        model = genai.GenerativeModel('gemini-3-flash-preview', system_instruction=full_prompt)
-        print("Gemini Model Initialized with Memory (gemini-3-flash-preview).")
+    if ai_client:
+        print(f"GenAI Client Initialized. Current Model: {CURRENT_MODEL_NAME}")
 
     yield
     # 終了時の処理
     print("MIO Shutdown.")
 
+
 app = FastAPI(lifespan=lifespan)
+
+# セッション管理: このIDより後のメッセージのみ会話履歴として渡す（0=全件）
+SESSION_START_ID: int = 0
+
+class AddFactRequest(BaseModel):
+    text: str
 
 class ChatRequest(BaseModel):
     text: str
@@ -118,7 +215,6 @@ class SpeakRequest(BaseModel):
     mode: str = None  # LOCAL, API, or None (use default)
 
 from fastapi.responses import StreamingResponse
-import json
 import asyncio
 
 # グローバルなHTTPクライアント（コネクションプール用）
@@ -251,15 +347,13 @@ async def get_camera_snapshot():
 async def get_embedding(text):
     if not text: return None
     try:
-        if not GEMINI_API_KEY: return None
-        # gemini-embedding-001 モデルを使用
+        if not ai_client: return None
         result = await asyncio.to_thread(
-            genai.embed_content,
+            ai_client.models.embed_content,
             model="models/gemini-embedding-001",
-            content=text,
-            task_type="retrieval_document" # 検索・保存用として最適化
+            contents=text
         )
-        return result['embedding']
+        return result.embeddings[0].values
     except Exception as e:
         print(f"Embedding Error ({type(e).__name__}): {e}") # 詳細エラーログ
         return None
@@ -291,119 +385,278 @@ async def upload_image(req: ImageUploadRequest):
 async def stream_chat_endpoint(text: str, mode: str = None, image_id: str = None):
     print(f"Mio v4 (Streaming) - Received: {text} (Mode: {mode}, Image: {image_id})")
     
+    # ─── ★ ここでオートコンパクションを判定 ★ ───
+    try:
+        token_status = await get_context_status() 
+        if token_status.get("auto_compact_required", False):
+            print("🚨 オートコンパクション発動！トークンが95%を超えました！")
+            await compact_memory() 
+    except Exception as e:
+        print(f"オートコンパクション判定でエラー (スルーして会話を優先): {e}")
+
     # 画像データの準備（あれば）
     gemini_image_part = None
     if image_id and image_id in image_storage:
         try:
             # Base64デコード
             img_data = base64.b64decode(image_storage[image_id])
-            # Geminiに入力できる形式 (Blobなど) に変換する必要があるが、
-            # google.generativeai は PIL image や辞書形式を受け取れる
-            gemini_image_part = {
-                "mime_type": "image/jpeg",
-                "data": img_data
-            }
+            gemini_image_part = types.Part.from_bytes(
+                data=img_data,
+                mime_type="image/jpeg"
+            )
             print("★ Image retrieved for prompt!")
             # １回使ったら消す（メモリ節約）
             del image_storage[image_id]
         except Exception as e:
             print(f"Image load error: {e}")
 
-    # 1. ユーザー発言のベクトル化
-    user_embedding = await get_embedding(text)
+    # RAGと埋め込み（Embedding）の廃止にともない、メッセージログの保存のみを行う（ベクトルなし）
+    await db.log_message("user", text, embedding=None)
 
-    # 2. 類似記憶の検索 (RAG)
-    related_memories = []
-    if user_embedding:
-        related_memories = await db.search_similar_context(user_embedding, limit=3)
-    
-    # 3. ユーザー発言を保存 (ベクトル付き)
-    await db.log_message("user", text, embedding=user_embedding)
+    # 現在のセッション開始ID以降の会話履歴のみ取得
+    history_data = await db.get_recent_context(limit=1000, since_id=SESSION_START_ID)
 
-    # 4. プロンプトの構築 (記憶の注入)
-    # 過去の会話履歴を取得
-    history_data = await db.get_recent_context(limit=10)
-    gemini_history = []
-    
-    for log in history_data:
-        role = "model" if log["role"] == "assistant" else "user"
-        gemini_history.append({"role": role, "parts": [log["content"]]})
-
-    # もし関連記憶が見つかったら、入力テキストに情報を付与する (Context Injection)
+    # RAGを廃止したため、注入用の拡張テキストは作らず、ユーザーの入力をそのままモデルに送る
     augmented_text = text
-    if related_memories:
-        memory_text = "\n".join([f"- {m['content']}" for m in related_memories])
-        print(f"★ RAG Hit: {len(related_memories)} memories found.")
-        augmented_text = f"【関連する過去の記憶】\n{memory_text}\n\n【ユーザーの発言】\n{text}"
 
     # フロントからの指定があればそれを使い、なければ環境変数のデフォルトを使う
     active_mode = mode if mode else TTS_MODE
 
     async def event_generator():
-        if not model:
-            yield f"data: {json.dumps({'error': 'Model not loaded'})}\n\n"
+        if not ai_client:
+            yield f"data: {json.dumps({'error': 'Client not loaded'})}\n\n"
             return
         
         try:
-            # Input Content (Text or Multimodal)
-            input_content = augmented_text
+            # 履歴データのマッピング（新SDK用の types.Content 形式に変換）
+            # get_recent_context は直近順（新しい順）で返ってくるので、逆順にして古い順にする
+            contents = []
+            for log in reversed(history_data):
+                role = "model" if log["role"] == "assistant" else "user"
+                contents.append(types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=log["content"])]
+                ))
+                
+            # 最後の入力コンテンツを追加（画像がある場合はマルチモーダル）
+            last_parts = [types.Part.from_text(text=augmented_text)]
             if gemini_image_part:
-                input_content = [augmented_text, gemini_image_part]
+                last_parts.append(gemini_image_part)
                 print("★ Sending Multimodal Request to Gemini...")
-
-            chat_session = model.start_chat(history=gemini_history)
-            response_stream = await asyncio.to_thread(chat_session.send_message, input_content, stream=True)
+                
+            contents.append(types.Content(
+                role="user",
+                parts=last_parts
+            ))
             
+            # generation_config の構築
+            # システムプロンプトを注入
+            long_term_memory = load_memory_files()
+            full_prompt = BASE_SYSTEM_PROMPT + long_term_memory
+            
+            config_args = {
+                "system_instruction": full_prompt,
+                "tools": [search_archive]
+            }
+            
+            # models/ プレフィックスの有無にかかわらず判定
+            model_name_lower = CURRENT_MODEL_NAME.lower()
+            if "gemini-3" in model_name_lower:
+                config_args["thinking_config"] = types.ThinkingConfig(thinking_level="MINIMAL")
+            elif "gemini-2.5" in model_name_lower:
+                config_args["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+                
             buffer = ""
             full_response_text = "" # 最終的にDBに保存するための全文バッファ
             
             pending_audio_tasks = []
             usage_info = {} # トークン情報格納用
+            
+            # タグ隠蔽用の一時バッファ
+            buffer_for_tag = ""
+            in_possible_tag = False
+            
+            # Gemmaの <thinking> 隠蔽用バッファとフラグ
+            buffer_for_thinking = ""
+            in_thinking = False
 
-            for chunk in response_stream:
-                # 最後のチャンクにusageメタデータが含まれる場合がある
-                if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
-                    usage_info = {
-                        "prompt_token_count": chunk.usage_metadata.prompt_token_count,
-                        "candidates_token_count": chunk.usage_metadata.candidates_token_count,
-                        "total_token_count": chunk.usage_metadata.total_token_count
-                    }
+            # ─── ★ ツール解決ループ (Function Calling Loop) ★ ───
+            while True:
+                config = types.GenerateContentConfig(**config_args)
+                try:
+                    # ストリーム呼び出し（新SDK）
+                    response_stream = await asyncio.to_thread(
+                        ai_client.models.generate_content_stream,
+                        model=CURRENT_MODEL_NAME,
+                        contents=contents,
+                        config=config
+                    )
+                except Exception as e:
+                    # thinking_config がサポートされていなくてエラーになった場合
+                    if "thinking" in str(e).lower() or "budget" in str(e).lower() or "config" in str(e).lower() or "invalid_argument" in str(e).lower():
+                        print(f"⚠ thinking_config not supported for model {CURRENT_MODEL_NAME}, retrying without thinking config: {e}")
+                        # thinking_config を除去して再試行！
+                        config_args.pop("thinking_config", None)
+                        config = types.GenerateContentConfig(**config_args)
+                        response_stream = await asyncio.to_thread(
+                            ai_client.models.generate_content_stream,
+                            model=CURRENT_MODEL_NAME,
+                            contents=contents,
+                            config=config
+                        )
+                    else:
+                        raise e
 
-                chunk_text = chunk.text
-                if not chunk_text: continue
+                has_function_call = False
+                function_calls = []
+
+                for chunk in response_stream:
+                    # 最後のチャンクにusageメタデータが含まれる場合がある
+                    if chunk.usage_metadata:
+                        usage_info = {
+                            "prompt_token_count": chunk.usage_metadata.prompt_token_count,
+                            "candidates_token_count": chunk.usage_metadata.candidates_token_count,
+                            "total_token_count": chunk.usage_metadata.total_token_count
+                        }
+
+                    # ツールコールの検知 (Google GenAI SDK 形式)
+                    if hasattr(chunk, 'function_calls') and chunk.function_calls:
+                        has_function_call = True
+                        function_calls.extend(chunk.function_calls)
+                        break
+
+                    chunk_text = chunk.text
+                    if not chunk_text: continue
+                    
+                    full_response_text += chunk_text
+                    
+                    # --- 自律記憶タグ [SAVE...] および <thinking> タグをリアルタイムで隠蔽するフィルター ---
+                    filtered_text_chunk = ""
+                    for char in chunk_text:
+                        # 1. 思考中の場合、</thinking> を探す
+                        if in_thinking:
+                            buffer_for_thinking += char
+                            if "</thinking>" in buffer_for_thinking:
+                                # 思考フェーズ終了！
+                                in_thinking = False
+                                buffer_for_thinking = ""
+                            continue
+                        
+                        # 2. <thinking> 開始の検知
+                        if char == "<":
+                            buffer_for_thinking = "<"
+                            continue
+                        elif buffer_for_thinking.startswith("<"):
+                            buffer_for_thinking += char
+                            if "thinking" in buffer_for_thinking:
+                                if buffer_for_thinking == "<thinking>":
+                                    in_thinking = True
+                                    buffer_for_thinking = ""
+                                    continue
+                            elif len(buffer_for_thinking) > 20: # <thinking> ではないので放出
+                                filtered_text_chunk += buffer_for_thinking
+                                buffer_for_thinking = ""
+                            continue
+
+                        # 3. 自律記憶タグの検知
+                        if char == "[":
+                            in_possible_tag = True
+                            buffer_for_tag += char
+                        elif in_possible_tag:
+                            buffer_for_tag += char
+                            if char == "]":
+                                # タグが閉じたので確認
+                                if "SAVE_USER_FACT:" in buffer_for_tag or "SAVE_EVENT:" in buffer_for_tag:
+                                    # システム用の自律記憶タグなので送信しない！
+                                    buffer_for_tag = ""
+                                    in_possible_tag = False
+                                else:
+                                    # 普通のカッコだったので溜めていた文字を放出
+                                    filtered_text_chunk += buffer_for_tag
+                                    buffer_for_tag = ""
+                                    in_possible_tag = False
+                            elif len(buffer_for_tag) > 100: # タグにしては長すぎるので諦めて放出
+                                filtered_text_chunk += buffer_for_tag
+                                buffer_for_tag = ""
+                                in_possible_tag = False
+                        else:
+                            filtered_text_chunk += char
+                    
+                    if filtered_text_chunk:
+                        text_chunk = filtered_text_chunk
+                        buffer += text_chunk
+                        
+                        # ★テキストだけ先に送る！（爆速表示用）
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': text_chunk})}\n\n"
+                        
+                        if any(p in text_chunk for p in ["。", "！", "？", "!", "?", "\n"]):
+                            # バッファ全体を句読点で分割
+                            sentences = buffer.replace("\n", "。").split("。")
+                            
+                            # 最後の要素以外は「確定した文」とみなして音声合成へ
+                            for s in sentences[:-1]:
+                                if s.strip() and active_mode != "NONE":
+                                    clean_text = s.strip() + "。"
+                                    # 音声合成タスクを開始（テキストは送らない、音声のみ）
+                                    task = asyncio.create_task(synthesize_audio_task(clean_text, active_mode))
+                                    pending_audio_tasks.append(task)
+                            
+                            # 未確定分をバッファに残す
+                            buffer = sentences[-1]
+                            
+                            # 完了した音声タスクから順に送出
+                            while pending_audio_tasks and pending_audio_tasks[0].done():
+                                audio = await pending_audio_tasks.pop(0)
+                                if audio:
+                                    yield f"data: {json.dumps({'type': 'audio', 'content': audio})}\n\n"
+
+                # ツールコールが発生しなかった場合は、通常の会話生成が完了したのでループを抜ける！
+                if not has_function_call:
+                    break
+
+                # ツールコールの実行と履歴への追加
+                model_parts = []
+                tool_parts = []
+                for call in function_calls:
+                    print(f"🛠️ Tool Call Detected: {call.name} (args: {call.args})")
+                    if call.name == "search_archive":
+                        query = call.args.get("query", "")
+                        # 澪の脳内に「ちょっと待ってね、思い出してみる……」というシグナルを送る
+                        tool_loading_msg = json.dumps({'type': 'chunk', 'content': ' *澪（ちょっと待ってね、引き出しから昔の記憶を探してるよ……）* \n\n'})
+                        yield f"data: {tool_loading_msg}\n\n"
+                        
+                        # 検索実行
+                        result = search_archive(query)
+                        print(f"   -> Search Result: {result[:100]}...")
+                        
+                        # APIにツール呼び出し要求の履歴を積む
+                        fc_part = types.Part(
+                            function_call=types.FunctionCall(
+                                name=call.name,
+                                args=call.args,
+                                id=getattr(call, 'id', None)
+                            )
+                        )
+                        model_parts.append(fc_part)
+                        
+                        # ツールからの実行結果
+                        fr_part = types.Part(
+                            function_response=types.FunctionResponse(
+                                name=call.name,
+                                response={"result": result},
+                                id=getattr(call, 'id', None)
+                            )
+                        )
+                        tool_parts.append(fr_part)
+
+                # 会話履歴に積む (modelロール と toolロール のやり取り)
+                contents.append(types.Content(role="model", parts=model_parts))
+                contents.append(types.Content(role="tool", parts=tool_parts))
                 
-                full_response_text += chunk_text
-                if chunk.text:
-                    text_chunk = chunk.text
-                    buffer += text_chunk
-                    
-                    # ★テキストだけ先に送る！（爆速表示用）
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': text_chunk})}\n\n"
-                    
-                    if any(p in text_chunk for p in ["。", "！", "？", "!", "?", "\n"]):
-                        # バッファ全体を句読点で分割
-                        sentences = buffer.replace("\n", "。").split("。")
-                        
-                        # 最後の要素以外は「確定した文」とみなして音声合成へ
-                        for s in sentences[:-1]:
-                            if s.strip() and active_mode != "NONE":
-                                clean_text = s.strip() + "。"
-                                # 音声合成タスクを開始（テキストは送らない、音声のみ）
-                                task = asyncio.create_task(synthesize_audio_task(clean_text, active_mode))
-                                pending_audio_tasks.append(task)
-                        
-                        # 未確定分をバッファに残す
-                        buffer = sentences[-1]
-                        
-                        # 完了した音声タスクから順に送出
-                        while pending_audio_tasks and pending_audio_tasks[0].done():
-                            audio = await pending_audio_tasks.pop(0)
-                            if audio:
-                                yield f"data: {json.dumps({'type': 'audio', 'content': audio})}\n\n"
+                # while ループを戻って再度ストリームを叩く
 
             if buffer.strip():
                  # 最後に残ったテキストの音声合成
-                 # print(f"Synthesizing (Last): {buffer}") # Silent
                  pass
             # ループ終了後の残り（最後の文）処理
             if buffer.strip() and active_mode != "NONE":
@@ -422,29 +675,55 @@ async def stream_chat_endpoint(text: str, mode: str = None, image_id: str = None
                      # テキストは送らず音声のみ（テキストは逐次送ってるから）
                      yield f"data: {json.dumps({'type': 'audio', 'content': audio_b64})}\n\n"
             
-            # もしループ内で取れなくても、全体のレスポンスから取れる場合がある
-            if not usage_info and hasattr(response_stream, 'usage_metadata'):
-                 usage_info = {
-                    "prompt_token_count": response_stream.usage_metadata.prompt_token_count,
-                    "candidates_token_count": response_stream.usage_metadata.candidates_token_count,
-                    "total_token_count": response_stream.usage_metadata.total_token_count,
-                 }
-
             if usage_info:
+                usage_info["model"] = CURRENT_MODEL_NAME
                 print(f"Token Usage: {usage_info}")
                 yield f"data: {json.dumps({'type': 'usage', 'data': usage_info})}\n\n"
 
             # ★全ての処理が終わったら、MIOの返答を記憶（DB保存）
             if full_response_text:
-                # 返答もベクトル化して保存（非同期でやるのが理想だけど、ここではawaitで確実に）
+                # 返答もベクトル化して保存
                 ai_embedding = await get_embedding(full_response_text)
                 await db.log_message("assistant", full_response_text, embedding=ai_embedding)
+                
+                # ─── ★ 自律記憶タグの抽出・保存処理 ★ ───
+                try:
+                    if "[SAVE_USER_FACT:" in full_response_text:
+                        match = re.search(r"\[SAVE_USER_FACT:\s*(.*?)\]", full_response_text)
+                        if match:
+                            fact = match.group(1).strip()
+                            print(f"🧠 AI自律記憶発動 (ユーザー事実): {fact}")
+                            
+                            # USER.mdに自動書き込み
+                            user_md_path = "memory/USER.md"
+                            if os.path.exists(user_md_path):
+                                with open(user_md_path, "a", encoding="utf-8") as f:
+                                    f.write(f"\n- {fact}")
+                            # ベクトルDB登録
+                            fact_emb = await get_embedding(fact)
+                            await db.log_message("user_fact", fact, embedding=fact_emb)
+                            
+                    elif "[SAVE_EVENT:" in full_response_text:
+                        match = re.search(r"\[SAVE_EVENT:\s*(.*?)\]", full_response_text)
+                        if match:
+                            event = match.group(1).strip()
+                            print(f"🧠 AI自律記憶発動 (出来事): {event}")
+                            
+                            # MEMORY.mdに自動書き込み
+                            mem_md_path = "memory/MEMORY.md"
+                            if os.path.exists(mem_md_path):
+                                timestamp = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+                                with open(mem_md_path, "a", encoding="utf-8") as f:
+                                    f.write(f"\n- {timestamp}: {event}")
+                            # ベクトルDB登録
+                            event_emb = await get_embedding(event)
+                            await db.log_message("user_fact", event, embedding=event_emb)
+                except Exception as e:
+                    print(f"自律記憶の保存に失敗: {e}")
 
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
         except Exception as e:
-            import traceback
-            print(f"Stream Error: {traceback.format_exc()}")
+            print(f"Error in event_generator: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             
     # ヘルパー関数: タスク内で呼び出して結果を返す用
@@ -455,6 +734,112 @@ async def stream_chat_endpoint(text: str, mode: str = None, image_id: str = None
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # --- 記憶管理API ---
+
+# --- 新規追加：記憶ファイル参照API ---
+@app.get("/api/memory/file")
+async def get_memory_file(category: str):
+    filename_map = {
+        "user": "memory/USER.md",
+        "identity": "memory/IDENTITY.md",
+        "memory": "memory/MEMORY.md",
+        "archive": "memory/archive.md"
+    }
+    filepath = filename_map.get(category.lower())
+    if not filepath or not os.path.exists(filepath):
+        raise HTTPException(status_code=400, detail="無効なカテゴリまたはファイルが存在しません。")
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"status": "ok", "category": category, "content": content}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- 新規追加：手動記憶追加API ---
+@app.post("/api/memory/add_fact")
+async def add_memory_fact(req: AddFactRequest):
+    filepath = "memory/MEMORY.md"
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=500, detail="長期記憶ファイルが見つかりません。")
+        
+    timestamp = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    new_line = f"\n- {timestamp}: {req.text}"
+    
+    try:
+        with open(filepath, "a", encoding="utf-8") as f:
+            f.write(new_line)
+            
+        # RAG廃止にともない、メッセージ記録時のベクトル埋め込み（Embedding）を無効化
+        await db.log_message("user_fact", req.text, embedding=None)
+            
+        return {"status": "ok", "message": "記憶を追加したよ！"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- 新規追加：モデル管理API ---
+@app.get("/api/model/current")
+async def get_current_model():
+    global CURRENT_MODEL_NAME
+    return {"status": "ok", "model": CURRENT_MODEL_NAME}
+
+@app.post("/api/model/set")
+async def set_ai_model(model_name: str):
+    global CURRENT_MODEL_NAME
+    try:
+        print(f"🔄 Switching model to: {model_name}")
+        if not ai_client:
+            raise HTTPException(status_code=500, detail="APIクライアントが初期化されていません。")
+            
+        CURRENT_MODEL_NAME = model_name
+        
+        # モデル設定を永続化保存
+        save_current_model(model_name)
+        
+        print(f"✨ Successfully switched to {model_name}!")
+        return {"status": "ok", "model": model_name}
+    except Exception as e:
+        print(f"❌ Failed to switch model: {e}")
+        raise HTTPException(status_code=500, detail=f"モデルの切り替えに失敗したよ: {str(e)}")
+
+# --- 新規追加：コンテキスト（トークン）監視API ---
+@app.get("/api/model/context_status")
+async def get_context_status():
+    global CURRENT_MODEL_NAME
+    if not ai_client:
+        raise HTTPException(status_code=500, detail="APIクライアントが初期化されていません。")
+        
+    try:
+        long_term_memory = load_memory_files()
+        system_instruction = BASE_SYSTEM_PROMPT + long_term_memory
+        
+        history_data = await db.get_recent_context(limit=50)
+        
+        total_text_to_count = system_instruction
+        for log in history_data:
+            total_text_to_count += f"\n{log['role']}: {log['content']}"
+            
+        token_count_resp = await asyncio.to_thread(
+            ai_client.models.count_tokens,
+            model=CURRENT_MODEL_NAME,
+            contents=total_text_to_count
+        )
+        current_tokens = token_count_resp.total_tokens
+        
+        max_tokens = MODEL_MAX_TOKENS.get(CURRENT_MODEL_NAME, 1_048_576)
+        percent = (current_tokens / max_tokens) * 100
+        
+        auto_compact_required = percent >= 95.0
+        
+        return {
+            "status": "ok",
+            "model": CURRENT_MODEL_NAME,
+            "current_tokens": current_tokens,
+            "max_tokens": max_tokens,
+            "percent": round(percent, 2),
+            "auto_compact_required": auto_compact_required
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"トークン計測失敗: {str(e)}"}
+
 @app.get("/favicon.ico")
 async def favicon():
     return ""
@@ -485,11 +870,10 @@ async def compact_memory():
         conversation_text += f"{log['role']}: {log['content']}\n"
 
     # 2. 司書AI (Librarian) による分析
-    librarian_prompt = """
-    あなたは会話ログ整理の専門AI（司書）です。以下の会話ログを分析し、長期記憶ファイルに保存すべき重要な情報を抽出してください。
-    
-    【重要ルール：情報の振り分け】
-    以下の3つのカテゴリに情報を厳密に振り分けてください。**同じ情報を複数のカテゴリに入れないこと。**
+        librarian_prompt = """
+    あなたは優秀な司書AIです。
+    会話ログを分析し、蓄積すべき重要な事実や思い出を抽出してください。
+    以下の4つのカテゴリに情報を厳密に振り分けてください。**同じ情報を複数のカテゴリに入れないこと。**
 
     1. **user_updates (ユーザー情報)**:
        - ユーザーのプロフィール、性格、好み、癖、思想、身体的特徴、仕事、家族構成など。
@@ -502,9 +886,13 @@ async def compact_memory():
        - 例：「のんびり屋である」「～だよ口調を使う」「ユーザーをマスターと呼ぶ」
 
     3. **memory_updates (長期記憶・エピソード)**:
-       - 過去に起こった具体的な出来事、約束、会話したトピック、一緒に行った場所、特定の文脈での合意事項。
+       - 過去に起こった具体的な出来事、約束、会話したトピック、一緒に行った場所、特定の文脈での合意事項のうち、「直近で今後もよく参照するであろう大切な思い出や約束」。
        - **※ユーザーのプロフィール的情報はここには含めず、user_updatesに入れてください。**
        - 例：「遊園地に行く約束をした」「AI倫理について議論した」「2024年の誕生日の思い出」
+
+    4. **archive_updates (長期アーカイブ記憶・当分いらない細かい情報)**:
+       - 当分使わないであろう古い選考データ（過去の特定の企業の面接の質問や結果等）、終わったプロジェクトの詳細、昔のデバッグや開発の詳細ログ、過去の旅行の細かいタイムスケジュールなど。
+       - 普段のチャットプロンプトに入れる必要はないが、将来マスターから「あのときの〜ってどうだっけ？」と聞かれたらツールで検索して引っ張り出したい過去の記録。
 
     【出力形式】
     以下のJSON形式で出力してください：
@@ -512,6 +900,7 @@ async def compact_memory():
       "user_updates": ["追加すべきユーザーの事柄"],
       "identity_updates": ["追加すべきAI自身の事柄"],
       "memory_updates": ["追加すべきイベントや知識"],
+      "archive_updates": ["アーカイブに移すべき古いまたは詳細な事柄"],
       "summary": "会話全体の簡潔な要約（100文字以内）"
     }
     """
@@ -519,16 +908,20 @@ async def compact_memory():
     token_usage = {"prompt_token_count": 0, "candidates_token_count": 0, "total_token_count": 0}
     updates = {}
     
-    if GEMINI_API_KEY:
+    if ai_client:
         try:
             # 分析用モデル
-            librarian = genai.GenerativeModel(
-                'gemini-3-flash-preview', 
+            config = types.GenerateContentConfig(
                 system_instruction=librarian_prompt,
-                generation_config={"response_mime_type": "application/json"}
+                response_mime_type="application/json"
             )
             
-            resp = await asyncio.to_thread(librarian.generate_content, conversation_text)
+            resp = await asyncio.to_thread(
+                ai_client.models.generate_content,
+                model='gemini-3-flash-preview', 
+                contents=conversation_text,
+                config=config
+            )
             
             # トークン使用量の取得（詳細）
             if resp.usage_metadata:
@@ -542,8 +935,6 @@ async def compact_memory():
             print(f"Librarian Analysis: {updates}")
             
             # 3. 編纂AI (Compiler) による情報の統合と更新
-            compiler_model = genai.GenerativeModel('gemini-3-flash-preview')
-
             async def update_file(filepath, new_info_list, category_name):
                 if not new_info_list: return
                 
@@ -567,14 +958,18 @@ async def compact_memory():
                 【編集ルール】
                 1. 情報が重複している場合は、一つにまとめてください。
                 2. 新しい情報が既存の情報と矛盾する場合、新しい情報を優先して更新してください。
-                3. 似たような情報は箇条書きでまとめて整理してください。
+                3. 似たような情報は箇流書きでまとめて整理してください。
                 4. 出力はファイルの内容そのもの（Markdown形式）のみを出力してください。余計な説明は不要です。
                 5. ヘッダー（# User Profile など）は維持してください。
                 """
                 
                 try:
                     # 編纂実行
-                    resp = await asyncio.to_thread(compiler_model.generate_content, compiler_prompt)
+                    resp = await asyncio.to_thread(
+                        ai_client.models.generate_content,
+                        model='gemini-3-flash-preview',
+                        contents=compiler_prompt
+                    )
                     new_content = resp.text.strip()
                     
                     # トークン計算（加算）
@@ -599,6 +994,25 @@ async def compact_memory():
             await update_file("memory/IDENTITY.md", updates.get("identity_updates"), "AI Identity")
             await update_file("memory/MEMORY.md", updates.get("memory_updates"), "Long Term Memory")
 
+            # archive_updates が存在する場合は、memory/archive.md の末尾にタイムスタンプ付きで追記（アペンド）するよ！
+            archive_list = updates.get("archive_updates")
+            if archive_list:
+                archive_filepath = "memory/archive.md"
+                timestamp = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+                try:
+                    os.makedirs("memory", exist_ok=True)
+                    if not os.path.exists(archive_filepath):
+                        with open(archive_filepath, "w", encoding="utf-8") as f:
+                            f.write("# Long Term Archive Memory\n")
+                            
+                    with open(archive_filepath, "a", encoding="utf-8") as f:
+                        f.write(f"\n## Archive [{timestamp}]\n")
+                        for item in archive_list:
+                            f.write(f"- {item}\n")
+                    print(f"★ Appended {len(archive_list)} items to archive.md")
+                except Exception as e:
+                    print(f"Archive Append Error: {e}")
+
             # 4. コンパクション履歴の保存
             summary_text = updates.get("summary", "No summary provided.")
             await db.log_compaction(
@@ -611,6 +1025,8 @@ async def compact_memory():
             
             # 5. 短期記憶の消去 (Compaction成功時のみ)
             await db.clear_logs()
+            global SESSION_START_ID
+            SESSION_START_ID = 0  # ログが全消去されたのでセッション制限をリセット
 
         except Exception as e:
             import traceback
@@ -624,6 +1040,14 @@ async def compact_memory():
         "updates": updates,
         "token_usage": token_usage
     }
+
+@app.post("/api/new_session")
+async def new_session():
+    """現在のDB最大IDを記録し、以降のメッセージのみ会話履歴として渡すようにする（/new コマンド用）"""
+    global SESSION_START_ID
+    SESSION_START_ID = await db.get_max_id()
+    print(f"[Session] New session started. History cutoff ID: {SESSION_START_ID}")
+    return {"status": "ok", "session_start_id": SESSION_START_ID}
 
 @app.get("/api/memory/compaction_logs")
 async def get_compaction_logs(limit: int = 10):
