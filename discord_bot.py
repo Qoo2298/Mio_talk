@@ -271,7 +271,40 @@ async def on_message(message: discord.Message):
         return
     
     user_text = message.content.strip()
-    if not user_text:
+    
+    # 画像の取得・アップロード処理
+    image_id = None
+    if message.attachments:
+        for attachment in message.attachments:
+            # 添付ファイルが画像かチェック
+            if attachment.content_type and attachment.content_type.startswith("image/"):
+                try:
+                    # 画像バイナリをダウンロード
+                    image_data = await attachment.read()
+                    
+                    # Base64エンコード
+                    import base64
+                    image_b64 = base64.b64encode(image_data).decode("utf-8")
+                    
+                    # バックエンドの /api/upload_image にアップロード
+                    async with http_session.post(
+                        f"{MIO_API_BASE}/api/upload_image",
+                        json={"image": image_b64}
+                    ) as upload_res:
+                        if upload_res.status == 200:
+                            upload_data = await upload_res.json()
+                            if upload_data.get("status") == "ok":
+                                image_id = upload_data.get("image_id")
+                                print(f"📸 画像アップロード成功: image_id = {image_id}")
+                except Exception as e:
+                    print(f"❌ 画像アップロード失敗: {e}")
+                break  # 最初の1枚のみ処理
+
+    # 画像があって、テキストがない場合（画像だけ送られたとき）のフォールバック
+    if image_id and not user_text:
+        user_text = "この画像について教えて！"
+
+    if not user_text and not image_id:
         return
 
     # 古い!プレフィックスの互換性用（スラッシュコマンドを推奨するメッセージを送るのも親切）
@@ -281,7 +314,7 @@ async def on_message(message: discord.Message):
         await handle_compaction(message)
         return
     
-    print(f"📩 受信: {user_text}")
+    print(f"📩 受信: {user_text} (画像ID: {image_id})")
 
     async with message.channel.typing():
         bot_message = None
@@ -291,7 +324,7 @@ async def on_message(message: discord.Message):
 
         try:
             # ジェネレーターから逐次受け取る
-            async for item in call_mio_streaming_generator(user_text):
+            async for item in call_mio_streaming_generator(user_text, image_id=image_id):
                 if item["type"] == "content":
                     content_chunk = item["data"]
                     full_text += content_chunk
@@ -368,12 +401,14 @@ async def on_message(message: discord.Message):
             print(f"❌ Error: {e}")
             await message.channel.send(f"⚠️ エラー: {str(e)[:100]}")
 
-async def call_mio_streaming_generator(text: str):
+async def call_mio_streaming_generator(text: str, image_id: str = None):
     """MIOからの応答を逐次yieldするジェネレーター"""
     import json
     from urllib.parse import quote
     
     url = f"{MIO_API_BASE}/api/stream_chat?text={quote(text)}&mode=NONE"
+    if image_id:
+        url += f"&image_id={quote(image_id)}"
     buffer = ""
     
     try:
